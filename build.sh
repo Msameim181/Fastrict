@@ -9,7 +9,7 @@ echo "🔧 Building fastrict package..."
 rm -rf build/ dist/ *.egg-info/
 
 # Install build dependencies
-pip install --upgrade pip setuptools wheel build
+pip install --upgrade pip setuptools wheel build twine
 
 # Build the package
 python -m build
@@ -23,5 +23,4 @@ echo "🚀 To install locally:"
 echo "pip install dist/fastrict-1.0.0-py3-none-any.whl"
 echo ""
 echo "📤 To upload to PyPI:"
-echo "pip install twine"
 echo "twine upload dist/*"
