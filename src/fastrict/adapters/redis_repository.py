@@ -7,8 +7,6 @@ import redis
 
 from ..use_cases.key_extraction import RateLimitException
 from ..use_cases.interface.interface import IRateLimitRepository
-from fastapi import HTTPException
-
 
 class RedisRateLimitRepository(IRateLimitRepository):
     """Redis-based implementation of rate limiting repository.
@@ -28,20 +26,14 @@ class RedisRateLimitRepository(IRateLimitRepository):
 
         if redis_client is None:
             if redis_url is None:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Either redis_url or redis_client must be provided",
-                )
+                raise ValueError("Either redis_url or redis_client must be provided")
             self.redis_client = redis.from_url(redis_url, decode_responses=True)
         else:
             self.redis_client = redis_client
         try:
             self.redis_client.ping()
         except redis.ConnectionError as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to connect to Redis: {str(e)}"
-            )
+            raise  ConnectionError(f"Failed to connect to Redis: {str(e)}")
         self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.key_prefix = key_prefix
 
