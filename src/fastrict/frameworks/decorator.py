@@ -77,7 +77,9 @@ def throttle(
             strategy_name = strategy
         elif limit is not None and ttl is not None:
             # Create inline strategy
-            rate_limit_strategy = RateLimitStrategy(name=RateLimitStrategyName.CUSTOM, limit=limit, ttl=ttl)
+            rate_limit_strategy = RateLimitStrategy(
+                name=RateLimitStrategyName.CUSTOM, limit=limit, ttl=ttl
+            )
         else:
             # Use default strategy name if nothing specified
             strategy_name = RateLimitStrategyName.MEDIUM
