@@ -1,5 +1,7 @@
+import logging
 from typing import List, Optional
 
+from chromatrace import LoggingConfig, LoggingSettings
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -26,6 +28,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         default_strategy_name: RateLimitStrategyName = RateLimitStrategyName.MEDIUM,
         excluded_paths: Optional[List[str]] = None,
         enabled: bool = True,
+        logger: Optional[logging.Logger] = None,
     ):
         """
         Initialize rate limiting middleware.
@@ -43,6 +46,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.default_strategy_name = default_strategy_name
         self.excluded_paths = excluded_paths or []
         self.enabled = enabled
+        self.logger = logger or logging.getLogger("fastrict.middleware")
 
         # Update strategies if provided
         if default_strategies:
@@ -61,15 +65,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Skip if rate limiting is disabled
         if not self.enabled:
             return await call_next(request)
-
         # Skip excluded paths
         if self._is_path_excluded(request.url.path):
+            self.logger.debug(f"Path {request.url.path} is excluded from rate limiting")
             return await call_next(request)
 
         try:
             # Get route-specific configuration
             endpoint = request.scope.get("endpoint")
             route_config = None
+            # If endpoint is not in scope (common with middleware),
+            # try to find it from the FastAPI app's routes
+            if not endpoint:
+                endpoint = self._find_endpoint_from_app(request)
 
             if endpoint:
                 route_config = get_rate_limit_config(endpoint)
@@ -81,7 +89,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             # Perform rate limit check
             try:
                 result = self.rate_limit_use_case.check_rate_limit(
-                    request=request, config=route_config, default_strategy_name=self.default_strategy_name
+                    request=request,
+                    config=route_config,
+                    default_strategy_name=self.default_strategy_name,
                 )
 
                 # Continue to next handler
@@ -94,11 +104,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             except RateLimitHTTPException as e:
                 # Rate limit exceeded - return error response
-                return JSONResponse(status_code=e.status_code, content=e.detail, headers=e.headers)
+                return JSONResponse(
+                    status_code=e.status_code, content=e.detail, headers=e.headers
+                )
 
         except Exception as e:
             # Log error but don't block request on middleware failure
-            print(f"Rate limiting middleware error: {str(e)}")
+            self.logger.error(f"Rate limiting middleware error: {str(e)}")
             return await call_next(request)
 
     def _is_path_excluded(self, path: str) -> bool:
@@ -129,6 +141,42 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         except Exception:
             # Don't fail the request if headers can't be added
             pass
+
+    def _find_endpoint_from_app(self, request):
+        """Find the endpoint function from the FastAPI app's routes.
+
+        This is needed because the middleware runs before FastAPI's routing
+        system sets the endpoint in the request scope.
+        """
+        try:
+            from fastapi import FastAPI
+            from starlette.routing import Match
+
+            app = request.scope.get("app")
+            if not isinstance(app, FastAPI):
+                return None
+
+            # Get the request path and method
+            path = request.url.path
+            method = request.method
+
+            # Try to match the route
+            for route in app.router.routes:
+                match, _ = route.matches({
+                    "type": "http",
+                    "method": method,
+                    "path": path,
+                })
+                if match == Match.FULL:
+                    # Found matching route, get the endpoint
+                    endpoint = getattr(route, "endpoint", None)
+                    return endpoint
+
+            return None
+
+        except Exception:
+            # If route matching fails, return None to fall back to default behavior
+            return None
 
     def update_strategies(self, strategies: List[RateLimitStrategy]) -> None:
         """Update available rate limiting strategies.
