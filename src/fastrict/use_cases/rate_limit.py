@@ -11,12 +11,13 @@ from ..entities import (
     RateLimitStrategy,
     RateLimitStrategyName,
 )
+from .interface.repository import IRateLimitRepository
 from .key_extraction import KeyExtractionUseCase, RateLimitException
 
 
 class RateLimitHTTPException(Exception):
     """HTTP exception for rate limiting."""
-    
+
     def __init__(self, status_code: int, detail: dict, headers: dict = None):
         self.status_code = status_code
         self.detail = detail
@@ -33,7 +34,7 @@ class RateLimitUseCase:
 
     def __init__(
         self,
-        rate_limit_repository,  # Will be injected
+        rate_limit_repository: IRateLimitRepository,  # Will be injected
         key_extraction_use_case: KeyExtractionUseCase,
         logger: Optional[logging.Logger] = None,
         default_strategies: Optional[List[RateLimitStrategy]] = None,
@@ -44,7 +45,9 @@ class RateLimitUseCase:
 
         # Set default strategies if not provided
         self.default_strategies = default_strategies or self._get_default_strategies()
-        self._strategy_map = {strategy.name: strategy for strategy in self.default_strategies}
+        self._strategy_map = {
+            strategy.name: strategy for strategy in self.default_strategies
+        }
 
     def _get_default_strategies(self) -> List[RateLimitStrategy]:
         """Get default rate limiting strategies."""
@@ -93,7 +96,9 @@ class RateLimitUseCase:
             key_strategy = self._determine_key_strategy(config)
 
             # Extract rate limiting key
-            rate_limit_key = self.key_extraction_use_case.extract_key(request, key_strategy)
+            rate_limit_key = self.key_extraction_use_case.extract_key(
+                request, key_strategy
+            )
 
             # Check bypass function if provided
             if config and config.bypass_function:
@@ -111,7 +116,9 @@ class RateLimitUseCase:
                     self.logger.warning(f"Bypass function failed: {str(e)}")
 
             # Perform rate limit check
-            current_count = self.rate_limit_repository.increment_counter(key=rate_limit_key, ttl=strategy.ttl)
+            current_count = self.rate_limit_repository.increment_counter(
+                key=rate_limit_key, ttl=strategy.ttl
+            )
 
             allowed = current_count <= strategy.limit
             retry_after = strategy.ttl if not allowed else None
@@ -146,13 +153,12 @@ class RateLimitUseCase:
             raise
         except Exception as e:
             self.logger.error(f"Rate limit check failed: {str(e)}")
-            raise RateLimitException(
-                message="Rate limit check failed",
-                status_code=500
-            )
+            raise RateLimitException(message="Rate limit check failed", status_code=500)
 
     def _determine_strategy(
-        self, config: Optional[RateLimitConfig], default_strategy_name: RateLimitStrategyName
+        self,
+        config: Optional[RateLimitConfig],
+        default_strategy_name: RateLimitStrategyName,
     ) -> RateLimitStrategy:
         """Determine which rate limiting strategy to use."""
         if config:
@@ -163,7 +169,7 @@ class RateLimitUseCase:
                 if not strategy:
                     raise RateLimitException(
                         message=f"Unknown strategy name: {config.strategy_name}",
-                        status_code=500
+                        status_code=500,
                     )
                 return strategy
 
@@ -172,11 +178,13 @@ class RateLimitUseCase:
         if not strategy:
             raise RateLimitException(
                 message=f"Default strategy not found: {default_strategy_name}",
-                status_code=500
+                status_code=500,
             )
         return strategy
 
-    def _determine_key_strategy(self, config: Optional[RateLimitConfig]) -> KeyExtractionStrategy:
+    def _determine_key_strategy(
+        self, config: Optional[RateLimitConfig]
+    ) -> KeyExtractionStrategy:
         """Determine key extraction strategy to use."""
         if config and config.key_extraction:
             return config.key_extraction
@@ -184,7 +192,9 @@ class RateLimitUseCase:
         # Default to IP-based key extraction
         return KeyExtractionStrategy(type=KeyExtractionType.IP)
 
-    def _get_error_message(self, config: Optional[RateLimitConfig], result: RateLimitResult) -> str:
+    def _get_error_message(
+        self, config: Optional[RateLimitConfig], result: RateLimitResult
+    ) -> str:
         """Get appropriate error message for rate limit violation."""
         if config and config.custom_error_message:
             return config.custom_error_message
@@ -213,9 +223,13 @@ class RateLimitUseCase:
         try:
             strategy = self._determine_strategy(config, default_strategy_name)
             key_strategy = self._determine_key_strategy(config)
-            rate_limit_key = self.key_extraction_use_case.extract_key(request, key_strategy)
+            rate_limit_key = self.key_extraction_use_case.extract_key(
+                request, key_strategy
+            )
 
-            current_count = self.rate_limit_repository.get_current_count(key=rate_limit_key)
+            current_count = self.rate_limit_repository.get_current_count(
+                key=rate_limit_key
+            )
 
             allowed = current_count < strategy.limit
             retry_after = strategy.ttl if not allowed else None
@@ -232,10 +246,7 @@ class RateLimitUseCase:
 
         except Exception as e:
             self.logger.error(f"Usage check failed: {str(e)}")
-            raise RateLimitException(
-                message="Usage check failed",
-                status_code=500
-            )
+            raise RateLimitException(message="Usage check failed", status_code=500)
 
     def update_strategies(self, strategies: List[RateLimitStrategy]) -> None:
         """Update the available rate limiting strategies.
@@ -245,7 +256,9 @@ class RateLimitUseCase:
         """
         self.default_strategies = strategies
         self._strategy_map = {strategy.name: strategy for strategy in strategies}
-        self.logger.info(f"Updated rate limiting strategies: {[s.name for s in strategies]}")
+        self.logger.info(
+            f"Updated rate limiting strategies: {[s.name for s in strategies]}"
+        )
 
     def get_strategy(self, name: RateLimitStrategyName) -> Optional[RateLimitStrategy]:
         """Get a specific rate limiting strategy by name.
