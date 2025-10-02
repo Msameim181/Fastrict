@@ -33,7 +33,7 @@ from .entities import (
 from .frameworks import RateLimitMiddleware, throttle
 from .use_cases import KeyExtractionUseCase, RateLimitUseCase
 
-__version__ = "1.0.0"
+__version__ = "0.0.2"
 __author__ = "Mohammad Mahdi Samei"
 __email__ = "9259samei@gmail.com"
 

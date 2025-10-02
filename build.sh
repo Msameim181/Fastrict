@@ -20,7 +20,7 @@ ls -la dist/
 
 echo ""
 echo "🚀 To install locally:"
-echo "pip install dist/fastrict-1.0.0-py3-none-any.whl"
+echo "pip install dist/fastrict-0.0.2-py3-none-any.whl"
 echo ""
 echo "📤 To upload to PyPI:"
 echo "twine upload dist/*"
