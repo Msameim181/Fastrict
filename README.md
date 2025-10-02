@@ -1074,7 +1074,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📈 Changelog & Roadmap
 
-### 🎯 Current Version: `v1.0.2`
+### 🎯 Current Version: `v0.0.2`
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 ### 🚀 Upcoming Features
