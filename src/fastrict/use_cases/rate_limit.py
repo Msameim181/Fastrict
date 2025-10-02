@@ -256,9 +256,10 @@ class RateLimitUseCase:
         """
         self.default_strategies = strategies
         self._strategy_map = {strategy.name: strategy for strategy in strategies}
-        self.logger.info(
-            f"Updated rate limiting strategies: {[s.name for s in strategies]}"
-        )
+        message = "Updated rate limiting strategies:"
+        for strategy in strategies:
+            message += f"\n- {strategy.name}: {strategy.limit} requests per {strategy.ttl} seconds"
+        self.logger.info(message)
 
     def get_strategy(self, name: RateLimitStrategyName) -> Optional[RateLimitStrategy]:
         """Get a specific rate limiting strategy by name.
