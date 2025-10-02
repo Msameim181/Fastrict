@@ -27,3 +27,15 @@ class RateLimitStrategyName(str, Enum):
     MEDIUM = "medium"  # Medium-term moderate limits (e.g., 20 requests per 10 minutes)
     LONG = "long"  # Long-term generous limits (e.g., 100 requests per hour)
     CUSTOM = "custom"  # Custom strategy defined via decorator
+
+
+class RateLimitMode(str, Enum):
+    """Rate limiting application modes.
+
+    This enum defines how rate limits are applied across the application:
+    - GLOBAL: All routes share the same rate limit pool globally
+    - PER_ROUTE: Each route has its own independent rate limit pool
+    """
+
+    GLOBAL = "global"  # Global rate limiting across all routes
+    PER_ROUTE = "per_route"  # Per-route rate limiting (route-specific pools)

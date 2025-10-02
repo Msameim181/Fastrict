@@ -1,6 +1,6 @@
 """Core entities for rate limiting system."""
 
-from .enums import KeyExtractionType, RateLimitStrategyName
+from .enums import KeyExtractionType, RateLimitMode, RateLimitStrategyName
 from .models import (
     KeyExtractionStrategy,
     RateLimitConfig,
@@ -11,6 +11,7 @@ from .models import (
 __all__ = [
     "KeyExtractionType",
     "RateLimitStrategyName",
+    "RateLimitMode",
     "KeyExtractionStrategy",
     "RateLimitConfig",
     "RateLimitResult",
