@@ -1,12 +1,12 @@
-
 import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 import redis
 
+from ..use_cases.interface.repository import IRateLimitRepository
 from ..use_cases.key_extraction import RateLimitException
-from ..use_cases.interface.interface import IRateLimitRepository
+
 
 class RedisRateLimitRepository(IRateLimitRepository):
     """Redis-based implementation of rate limiting repository.
@@ -17,23 +17,16 @@ class RedisRateLimitRepository(IRateLimitRepository):
 
     def __init__(
         self,
-        redis_url: Optional[str] = None,
-        redis_client: Optional[redis.Redis] = None,
+        redis_client: redis.Redis,
         logger: Optional[logging.Logger] = None,
         key_prefix: str = "rate_limit",
     ):
         """Initialize Redis rate limit repository."""
-
-        if redis_client is None:
-            if redis_url is None:
-                raise ValueError("Either redis_url or redis_client must be provided")
-            self.redis_client = redis.from_url(redis_url, decode_responses=True)
-        else:
-            self.redis_client = redis_client
+        self.redis_client = redis_client
         try:
             self.redis_client.ping()
         except redis.ConnectionError as e:
-            raise  ConnectionError(f"Failed to connect to Redis: {str(e)}")
+            raise ConnectionError(f"Failed to connect to Redis: {str(e)}")
         self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.key_prefix = key_prefix
 
@@ -43,10 +36,10 @@ class RedisRateLimitRepository(IRateLimitRepository):
         redis_url: str,
         logger: Optional[logging.Logger] = None,
         key_prefix: str = "rate_limit",
-        **redis_kwargs
+        **redis_kwargs,
     ):
         """Create repository from Redis URL.
-        
+
         Args:
             redis_url: Redis connection URL
             logger: Optional logger instance
@@ -97,7 +90,9 @@ class RedisRateLimitRepository(IRateLimitRepository):
             pipeline.zadd(redis_key, {str(now): now})
 
             # Set expiry for the key
-            pipeline.expire(redis_key, ttl + 1)  # Add buffer to prevent premature expiry
+            pipeline.expire(
+                redis_key, ttl + 1
+            )  # Add buffer to prevent premature expiry
 
             # Get current count
             pipeline.zcard(redis_key)
@@ -108,13 +103,19 @@ class RedisRateLimitRepository(IRateLimitRepository):
             # The last result is the count
             current_count = results[-1]
 
-            self.logger.debug(f"Rate limit increment - Key: {key}, Count: {current_count}, TTL: {ttl}")
+            self.logger.debug(
+                f"Rate limit increment - Key: {key}, Count: {current_count}, TTL: {ttl}"
+            )
 
             return current_count
 
         except Exception as e:
-            self.logger.error(f"Failed to increment rate limit counter for key {key}: {str(e)}")
-            raise RateLimitException(message="Rate limit counter increment failed", status_code=500)
+            self.logger.error(
+                f"Failed to increment rate limit counter for key {key}: {str(e)}"
+            )
+            raise RateLimitException(
+                message="Rate limit counter increment failed", status_code=500
+            )
 
     def get_current_count(self, key: str) -> int:
         """Get current count without incrementing.
@@ -151,7 +152,9 @@ class RedisRateLimitRepository(IRateLimitRepository):
             redis_key = self._get_redis_key(key)
             deleted_count = self.redis_client.delete(redis_key)
 
-            self.logger.debug(f"Rate limit reset - Key: {key}, Deleted: {deleted_count > 0}")
+            self.logger.debug(
+                f"Rate limit reset - Key: {key}, Deleted: {deleted_count > 0}"
+            )
 
             return deleted_count > 0
 
@@ -234,7 +237,9 @@ class RedisRateLimitRepository(IRateLimitRepository):
             window_start = now - ttl
 
             # Get all entries in the current window
-            entries = self.redis_client.zrangebyscore(redis_key, window_start, now, withscores=True)
+            entries = self.redis_client.zrangebyscore(
+                redis_key, window_start, now, withscores=True
+            )
 
             # Get key TTL
             key_ttl = self.get_ttl(key)
@@ -248,8 +253,12 @@ class RedisRateLimitRepository(IRateLimitRepository):
                 "window_size": ttl,
                 "key_ttl": key_ttl,
                 "entries": [float(score) for _, score in entries],
-                "oldest_entry": min([float(score) for _, score in entries]) if entries else None,
-                "newest_entry": max([float(score) for _, score in entries]) if entries else None,
+                "oldest_entry": min([float(score) for _, score in entries])
+                if entries
+                else None,
+                "newest_entry": max([float(score) for _, score in entries])
+                if entries
+                else None,
             }
 
         except Exception as e:
