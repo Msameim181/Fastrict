@@ -4,19 +4,19 @@ Test rate limiting functionality using memory repository.
 """
 
 import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 # Import the rate limiter components
 from fastrict import (
-    RateLimitMiddleware,
-    throttle,
-    MemoryRateLimitRepository,
-    RateLimitUseCase,
     KeyExtractionUseCase,
+    MemoryRateLimitRepository,
+    RateLimitMiddleware,
     RateLimitStrategy,
     RateLimitStrategyName,
-    KeyExtractionType,
+    RateLimitUseCase,
+    throttle,
 )
 
 # Configure logging

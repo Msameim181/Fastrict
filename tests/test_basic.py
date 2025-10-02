@@ -1,13 +1,12 @@
 """Basic tests for fastrict."""
 
 import pytest
-from unittest.mock import Mock
 
 from fastrict import (
-    RateLimitStrategy,
-    RateLimitStrategyName,
     KeyExtractionStrategy,
     KeyExtractionType,
+    RateLimitStrategy,
+    RateLimitStrategyName,
 )
 
 
@@ -66,12 +65,12 @@ class TestImports:
     def test_import_entities(self):
         """Test importing entity classes."""
         from fastrict import (
-            RateLimitStrategy,
-            RateLimitStrategyName,
             KeyExtractionStrategy,
             KeyExtractionType,
             RateLimitConfig,
             RateLimitResult,
+            RateLimitStrategy,
+            RateLimitStrategyName,
         )
 
         # Test that classes exist and can be instantiated
@@ -95,8 +94,8 @@ class TestImports:
     def test_import_use_cases(self):
         """Test importing use cases."""
         from fastrict import (
-            RateLimitUseCase,
             KeyExtractionUseCase,
+            RateLimitUseCase,
         )
 
         assert RateLimitUseCase is not None
