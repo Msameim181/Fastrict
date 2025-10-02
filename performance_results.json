@@ -1,0 +1,52 @@
+{
+  "timestamp": "2025-10-02T22:33:41.705999",
+  "single_request_latency": 0.36,
+  "sequential_performance": {
+    "Total Requests": 1000,
+    "Duration": 0.34,
+    "RPS": 2971.63,
+    "Avg Response Time": 0.34,
+    "P95 Response Time": 0.38
+  },
+  "concurrent_performance": {
+    "Total Requests": 1000,
+    "Duration": 0.26,
+    "RPS": 3779.09,
+    "Success Rate": 100.0,
+    "Avg Response Time": 13.04,
+    "P95 Response Time": 26.23,
+    "P99 Response Time": 26.62
+  },
+  "rate_limiting_accuracy": {
+    "Total Requests": 100,
+    "Rate Limited": 50,
+    "Avg Response Time": 10.22
+  },
+  "extreme_load": {
+    "Total Requests": 1000,
+    "Duration": 0.27,
+    "RPS": 3751.49,
+    "Success Rate": 100.0,
+    "Rate Limited": 0.0,
+    "Error Rate": 0.0,
+    "P99 Response Time": 30.97
+  },
+  "memory_efficiency": {
+    "Total Requests": 1000,
+    "Success Rate": 100.0,
+    "Avg Response Time": 228.27,
+    "P95 Response Time": 266.6
+  },
+  "sustained_load": {
+    "Total Requests": 911,
+    "Achieved RPS": 91.02,
+    "Success Rate": 100.0,
+    "Avg Response Time": 1.34,
+    "Performance Degradation": -11.7
+  },
+  "mode_comparison": {
+    "RPS": 3539.19,
+    "Avg Response Time": 97.28,
+    "P95 Response Time": 114.57
+  }
+}
