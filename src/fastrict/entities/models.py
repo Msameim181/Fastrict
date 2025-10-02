@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Callable, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .enums import KeyExtractionType, RateLimitStrategyName
 
@@ -17,17 +17,18 @@ class RateLimitStrategy(BaseModel):
     limit: int = Field(gt=0, description="Maximum number of requests allowed within the time window")
     ttl: int = Field(gt=0, description="Time window in seconds for the rate limit")
 
-    class Config:
-        frozen = True  # Immutable as per project guidelines
+    model_config = ConfigDict(frozen=True)  # Immutable as per project guidelines
 
     @field_validator("limit")
-    def validate_limit(cls, v):
+    @classmethod
+    def validate_limit(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("Rate limit must be greater than 0")
         return v
 
     @field_validator("ttl")
-    def validate_ttl(cls, v):
+    @classmethod
+    def validate_ttl(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("TTL must be greater than 0")
         return v
@@ -48,33 +49,29 @@ class KeyExtractionStrategy(BaseModel):
     )
     combination_keys: Optional[List[str]] = Field(default=None, description="List of keys to combine for COMBINED type")
 
-    class Config:
-        frozen = True
-        arbitrary_types_allowed = True  # Allow Callable type
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)  # Allow Callable type
 
-    @field_validator("field_name")
-    def validate_field_name(cls, v, values):
-        extraction_type = values.get("type")
+    @model_validator(mode='after')
+    def validate_extraction_strategy(self) -> 'KeyExtractionStrategy':
+        """Validate that required fields are present based on extraction type."""
+        extraction_type = self.type
+        
+        # Validate field_name requirement
         if (
             extraction_type in [KeyExtractionType.HEADER, KeyExtractionType.QUERY_PARAM, KeyExtractionType.FORM_FIELD]
-            and not v
+            and not self.field_name
         ):
-            raise ValueError(f"field_name is required for {extraction_type} extraction")
-        return v
-
-    @field_validator("extractor_function")
-    def validate_extractor_function(cls, v, values):
-        extraction_type = values.get("type")
-        if extraction_type == KeyExtractionType.CUSTOM and not v:
+            raise ValueError(f"field_name is required for {extraction_type.value} extraction")
+        
+        # Validate extractor_function requirement
+        if extraction_type == KeyExtractionType.CUSTOM and not self.extractor_function:
             raise ValueError("extractor_function is required for CUSTOM extraction")
-        return v
-
-    @field_validator("combination_keys")
-    def validate_combination_keys(cls, v, values):
-        extraction_type = values.get("type")
-        if extraction_type == KeyExtractionType.COMBINED and (not v or len(v) < 2):
+        
+        # Validate combination_keys requirement
+        if extraction_type == KeyExtractionType.COMBINED and (not self.combination_keys or len(self.combination_keys) < 2):
             raise ValueError("combination_keys must contain at least 2 keys for COMBINED extraction")
-        return v
+        
+        return self
 
 
 class RateLimitConfig(BaseModel):
@@ -97,17 +94,16 @@ class RateLimitConfig(BaseModel):
         default=None, description="Custom error message for rate limit violations"
     )
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("strategy_name")
-    def validate_strategy_options(cls, v, values):
-        strategy = values.get("strategy")
-        if strategy and v:
+    @model_validator(mode='after')
+    def validate_strategy_options(self) -> 'RateLimitConfig':
+        """Validate that exactly one strategy option is specified."""
+        if self.strategy and self.strategy_name:
             raise ValueError("Cannot specify both 'strategy' and 'strategy_name'")
-        if not strategy and not v:
+        if not self.strategy and not self.strategy_name:
             raise ValueError("Must specify either 'strategy' or 'strategy_name'")
-        return v
+        return self
 
 
 class RateLimitResult(BaseModel):
@@ -126,8 +122,7 @@ class RateLimitResult(BaseModel):
     strategy_name: RateLimitStrategyName = Field(description="Name of the strategy that was applied")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Timestamp when the check was performed")
 
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
     @property
     def remaining_requests(self) -> int:
