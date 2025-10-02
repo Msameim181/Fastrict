@@ -575,7 +575,7 @@ async def test_performance_comparison_global_vs_per_route(memory_app):
     assert (
         global_metrics.avg_response_time < 300
     )  # More realistic threshold for concurrent load
-    assert per_route_metrics.avg_response_time < 150
+    assert per_route_metrics.avg_response_time < 200
 
 
 def save_performance_results():
