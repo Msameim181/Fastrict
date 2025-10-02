@@ -47,7 +47,7 @@ rate_limiter = RateLimitUseCase(
 # Define custom strategies
 custom_strategies = [
     RateLimitStrategy(name=RateLimitStrategyName.SHORT, limit=3, ttl=60),  # 3/min
-    RateLimitStrategy(name=RateLimitStrategyName.MEDIUM, limit=10, ttl=300),  # 10/5min
+    RateLimitStrategy(name=RateLimitStrategyName.MEDIUM, limit=5, ttl=120),  # 5/2min
     RateLimitStrategy(name=RateLimitStrategyName.LONG, limit=50, ttl=3600),  # 50/hour
 ]
 
@@ -225,6 +225,7 @@ async def default_behavior():
 
 
 @app.get("/api/rate-limit-status")
+@throttle(bypass=True)
 async def rate_limit_status(request: Request):
     """Get current rate limit status without incrementing counter."""
 
