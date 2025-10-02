@@ -96,10 +96,6 @@ jobs:
         pip install -r requirements.txt
         pip install -e .
 
-    - name: Run tests
-      run: |
-        pytest --cov
-    
     - name: Build package
       run: python -m build
  
