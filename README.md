@@ -1028,7 +1028,7 @@ python src/examples/simple_example.py
 - **✨ Feature Requests**: Propose new features with use cases
 - **📝 Documentation**: Help improve our docs and examples
 - **🧪 Tests**: Maintain 100% test coverage
-- **🎨 Code Style**: Follow Black formatting and type hints
+- **🎨 Code Style**: Follow Ruff formatting and type hints
 
 ### 🏗️ Development Workflow
 
@@ -1043,10 +1043,10 @@ python src/examples/simple_example.py
 ## 📚 Resources & Documentation
 
 ### 📖 Documentation
-- **[API Reference](https://fastrict.readthedocs.io/api/)** - Complete API documentation
-- **[User Guide](https://fastrict.readthedocs.io/guide/)** - Step-by-step tutorials
+- **[API Reference](https://github.com/msameim181/fastrict)** - Complete API documentation
+- **[User Guide](https://github.com/msameim181/fastrict)** - Step-by-step tutorials
 - **[Examples](https://github.com/msameim181/fastrict/tree/main/examples)** - Real-world examples
-- **[Architecture](https://fastrict.readthedocs.io/architecture/)** - Design decisions
+- **[Architecture](https://github.com/msameim181/fastrict)** - Design decisions
 
 ### 🆘 Support Channels
 - **🐛 [Issue Tracker](https://github.com/msameim181/fastrict/issues)** - Bug reports & feature requests
@@ -1064,14 +1064,6 @@ python src/examples/simple_example.py
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-### 🎉 Why MIT?
-- ✅ **Commercial Use**: Use in commercial projects
-- ✅ **Modification**: Modify and distribute
-- ✅ **Distribution**: Share with others
-- ✅ **Private Use**: Use privately
-- ❌ **Liability**: No warranty provided
-- ❌ **Trademark**: Trademark rights not granted
-
 ## 📈 Changelog & Roadmap
 
 ### 🎯 Current Version: `v0.0.2`
@@ -1079,31 +1071,15 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 ### 🚀 Upcoming Features
 - **🌐 GraphQL Support**: Rate limiting for GraphQL endpoints
+- **🌐 Django Support**: Rate limiting for Django applications
 - **📊 Prometheus Metrics**: Built-in metrics collection
 - **🔄 Circuit Breaker**: Integrate with circuit breaker patterns
 - **🎯 Rate Limit Warming**: Gradual limit increases
 - **📱 WebSocket Support**: Rate limiting for WebSocket connections
-- **🧠 ML-based Limits**: Adaptive rate limiting using machine learning
-
-## ⭐ Star History
-
-If Fastrict has helped you build better APIs, please consider giving us a star! ⭐
-
-[![Star History Chart](https://api.star-history.com/svg?repos=msameim181/fastrict&type=Date)](https://star-history.com/#msameim181/fastrict&Date)
-
-## 🏆 Contributors
-
-Thanks to all our amazing contributors!
-
-<a href="https://github.com/msameim181/fastrict/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=msameim181/fastrict" />
-</a>
 
 ---
 
 <div align="center">
-
-**Built with ❤️ by [Mohammad Mahdi Samei](https://github.com/msameim181)**
 
 **Fastrict - Powering the next generation of FastAPI applications**
 
