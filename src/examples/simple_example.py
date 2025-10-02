@@ -6,8 +6,6 @@ Run with: python examples/simple_example.py
 Then test with: curl http://localhost:8000/api/data
 """
 
-import logging
-
 from chromatrace import LoggingConfig, LoggingSettings
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -17,6 +15,7 @@ from fastrict import (
     KeyExtractionType,
     KeyExtractionUseCase,
     RateLimitMiddleware,
+    RateLimitMode,
     RateLimitStrategy,
     RateLimitStrategyName,
     RateLimitUseCase,
@@ -59,6 +58,7 @@ app.add_middleware(
     default_strategies=custom_strategies,
     default_strategy_name=RateLimitStrategyName.MEDIUM,
     excluded_paths=["/health", "/docs", "/openapi.json"],
+    rate_limit_mode=RateLimitMode.GLOBAL,  # Default to global rate limiting
 )
 
 
@@ -171,13 +171,69 @@ async def admin_endpoint():
     return {"data": "Admin-only data", "admin_features": []}
 
 
-# Rate limit status endpoint
+# Global rate limiting example (shares limit with all other global endpoints)
+@app.get("/api/global-data")
+@throttle(
+    limit=5,
+    ttl=300,
+    rate_limit_mode=RateLimitMode.GLOBAL,
+)
+async def global_data():
+    """This endpoint shares rate limit globally (affects all global endpoints)."""
+    return {
+        "data": "Global rate limited data",
+        "note": "Shares limits with other global endpoints",
+    }
+
+
+# Per-route rate limiting example (independent limit per route)
+@app.get("/api/per-route-data")
+@throttle(
+    limit=5,
+    ttl=60,
+    rate_limit_mode=RateLimitMode.PER_ROUTE,
+)
+async def per_route_data():
+    """This endpoint has its own independent rate limit pool."""
+    return {
+        "data": "Per-route rate limited data",
+        "note": "Independent limits per route",
+    }
+
+
+# Another per-route endpoint to demonstrate independence
+@app.get("/api/another-route")
+@throttle(
+    limit=5,
+    ttl=60,
+    rate_limit_mode=RateLimitMode.PER_ROUTE,
+)
+async def another_per_route():
+    """Another per-route endpoint with independent limits."""
+    return {"data": "Another route data", "note": "Independent from other routes"}
+
+
+# Demonstrate default behavior (decorated routes use PER_ROUTE by default)
+@app.get("/api/default-behavior")
+@throttle(limit=3, ttl=60)
+async def default_behavior():
+    """Decorated routes default to PER_ROUTE mode when not specified."""
+    return {
+        "data": "Default behavior",
+        "note": "Defaults to PER_ROUTE for decorated routes",
+    }
+
+
 @app.get("/api/rate-limit-status")
 async def rate_limit_status(request: Request):
     """Get current rate limit status without incrementing counter."""
 
     try:
-        result = rate_limiter.get_current_usage(request)
+        result = rate_limiter.get_current_usage(
+            request=request,
+            middleware_rate_limit_mode=RateLimitMode.GLOBAL,
+            route_path=request.url.path,
+        )
         return {
             "allowed": result.allowed,
             "current_count": result.current_count,
@@ -209,6 +265,10 @@ if __name__ == "__main__":
     print("  GET  /api/user-data       - User ID rate limiting (15/10min)")
     print("  GET  /api/session-data    - Custom session rate limiting (25/10min)")
     print("  GET  /api/admin           - Admin bypass (5/min for non-admins)")
+    print("  GET  /api/global-data     - Global shared rate limiting (20/5min)")
+    print("  GET  /api/per-route-data  - Per-route independent limiting (5/min)")
+    print("  GET  /api/another-route   - Another per-route independent (5/min)")
+    print("  GET  /api/default-behavior - Default per-route for decorated (3/min)")
     print("  GET  /api/rate-limit-status - Check current rate limit status")
     print()
     print("🧪 Test commands:")
@@ -217,6 +277,14 @@ if __name__ == "__main__":
     print("  curl -H 'User-Role: admin' http://localhost:8000/api/admin")
     print("  curl 'http://localhost:8000/api/user-data?user_id=123'")
     print("  curl http://localhost:8000/api/rate-limit-status")
+    print("  # Test per-route independence:")
+    print("  curl http://localhost:8000/api/per-route-data")
+    print("  curl http://localhost:8000/api/another-route")
+    print()
+    print("💡 Rate Limiting Modes:")
+    print("  - GLOBAL: All endpoints share the same rate limit pool")
+    print("  - PER_ROUTE: Each route has independent rate limit pools")
+    print("  - Decorated routes default to PER_ROUTE unless overridden")
     print()
 
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
