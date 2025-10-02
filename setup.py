@@ -10,7 +10,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="fastrict",
-    version="0.0.2",
+    version="0.0.3",
     author="Mohammad Mahdi Samei",
     author_email="9259samei@gmail.com",
     description="A comprehensive rate limiting system for FastAPI with Redis backend",
