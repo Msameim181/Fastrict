@@ -117,6 +117,10 @@ class RateLimitConfig(BaseModel):
     enabled: bool = Field(
         default=True, description="Whether rate limiting is enabled for this route"
     )
+    bypass: bool = Field(
+        default=False,
+        description="Whether to completely bypass rate limiting for this route",
+    )
     bypass_function: Optional[Callable] = Field(
         default=None,
         description="Optional function to bypass rate limiting based on request",
