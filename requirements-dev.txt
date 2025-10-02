@@ -1,0 +1,33 @@
+# Development Requirements
+# Install with: pip install -r requirements-dev.txt
+
+# Core package dependencies
+-r requirements.txt
+
+# Development tools
+pytest>=6.0
+pytest-asyncio>=0.18.0
+pytest-cov>=2.0
+pytest-mock>=3.0
+
+# Code quality
+black>=22.0
+flake8>=4.0
+mypy>=0.950
+isort>=5.0
+
+# Documentation
+mkdocs>=1.4
+mkdocs-material>=8.0
+mkdocstrings[python]>=0.19
+
+# Testing tools
+httpx>=0.23.0  # For testing FastAPI
+fakeredis>=2.0  # Mock Redis for testing
+
+# Build tools
+build>=0.8.0
+twine>=4.0
+
+# Pre-commit hooks
+pre-commit>=2.0

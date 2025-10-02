@@ -1,0 +1,8 @@
+# Core dependencies
+fastapi>=0.68.0
+redis>=4.0.0
+pydantic>=1.8.0
+starlette>=0.14.0
+
+# Optional logging (can be replaced with standard logging)
+# chromatrace>=1.0.0  # Remove this dependency and use standard logging

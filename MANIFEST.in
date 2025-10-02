@@ -1,0 +1,13 @@
+include README.md
+include LICENSE
+include requirements.txt
+include pyproject.toml
+recursive-include fastrict *.py
+recursive-include tests *.py
+recursive-include examples *.py
+recursive-include docs *.md *.rst
+prune .git
+prune __pycache__
+prune *.pyc
+prune .pytest_cache
+prune .mypy_cache
