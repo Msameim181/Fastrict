@@ -2,9 +2,15 @@
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
 [project]
 name = "fastrict"
-version = "1.0.0"
+version = "1.0.1"
 description = "A comprehensive rate limiting system for FastAPI with Redis backend"
 readme = "README.md"
 requires-python = ">=3.8"
