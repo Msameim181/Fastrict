@@ -5,6 +5,7 @@ from ..entities import (
     KeyExtractionStrategy,
     KeyExtractionType,
     RateLimitConfig,
+    RateLimitMode,
     RateLimitStrategy,
     RateLimitStrategyName,
 )
@@ -22,6 +23,7 @@ def throttle(
     bypass_function: Optional[Callable] = None,
     custom_error_message: Optional[str] = None,
     enabled: bool = True,
+    rate_limit_mode: Optional[RateLimitMode] = RateLimitMode.PER_ROUTE,
 ):
     """Decorator for applying rate limiting to FastAPI route handlers.
 
@@ -40,6 +42,8 @@ def throttle(
         bypass_function: Function to bypass rate limiting based on request
         custom_error_message: Custom error message for rate limit violations
         enabled: Whether rate limiting is enabled for this route
+        rate_limit_mode: Override rate limiting mode (GLOBAL or PER_ROUTE).
+                        If not specified, decorated routes default to PER_ROUTE.
 
     Examples:
         @throttle(strategy=RateLimitStrategyName.SHORT)
@@ -53,10 +57,9 @@ def throttle(
         @throttle(
             limit=10,
             ttl=300,
-            key_type=KeyExtractionType.COMBINED,
-            key_combination=["ip", "header:User-Agent"]
+            rate_limit_mode=RateLimitMode.GLOBAL
         )
-        async def combined_key_endpoint():
+        async def global_shared_endpoint():
             pass
     """
 
@@ -101,6 +104,7 @@ def throttle(
             enabled=enabled,
             bypass_function=bypass_function,
             custom_error_message=custom_error_message,
+            rate_limit_mode=rate_limit_mode,
         )
 
         # Attach configuration to the wrapped function

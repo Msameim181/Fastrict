@@ -1,12 +1,11 @@
 import logging
 from typing import List, Optional
 
-from chromatrace import LoggingConfig, LoggingSettings
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from ..entities import RateLimitStrategy, RateLimitStrategyName
+from ..entities import RateLimitMode, RateLimitStrategy, RateLimitStrategyName
 from ..use_cases import RateLimitUseCase
 from ..use_cases.rate_limit import RateLimitHTTPException
 from .decorator import get_rate_limit_config
@@ -29,6 +28,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         excluded_paths: Optional[List[str]] = None,
         enabled: bool = True,
         logger: Optional[logging.Logger] = None,
+        rate_limit_mode: RateLimitMode = RateLimitMode.GLOBAL,
     ):
         """
         Initialize rate limiting middleware.
@@ -40,12 +40,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             default_strategy_name: Default strategy to use
             excluded_paths: Paths to exclude from rate limiting
             enabled: Whether rate limiting is globally enabled
+            rate_limit_mode: How to apply rate limits (GLOBAL or PER_ROUTE)
         """
         super().__init__(app)
         self.rate_limit_use_case = rate_limit_use_case
         self.default_strategy_name = default_strategy_name
         self.excluded_paths = excluded_paths or []
         self.enabled = enabled
+        self.rate_limit_mode = rate_limit_mode
         self.logger = logger or logging.getLogger("fastrict.middleware")
 
         # Update strategies if provided
@@ -92,6 +94,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     request=request,
                     config=route_config,
                     default_strategy_name=self.default_strategy_name,
+                    middleware_rate_limit_mode=self.rate_limit_mode,
+                    route_path=request.url.path,
                 )
 
                 # Continue to next handler
@@ -162,11 +166,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             # Try to match the route
             for route in app.router.routes:
-                match, _ = route.matches({
-                    "type": "http",
-                    "method": method,
-                    "path": path,
-                })
+                match, _ = route.matches(
+                    {
+                        "type": "http",
+                        "method": method,
+                        "path": path,
+                    }
+                )
                 if match == Match.FULL:
                     # Found matching route, get the endpoint
                     endpoint = getattr(route, "endpoint", None)
