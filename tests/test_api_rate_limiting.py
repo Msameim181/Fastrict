@@ -26,6 +26,7 @@ def app():
 
     # Setup rate limiting components with unique prefix for each test
     import time
+
     repository = MemoryRateLimitRepository(key_prefix=f"test_{int(time.time() * 1000)}")
     key_extraction = KeyExtractionUseCase()
     rate_limiter = RateLimitUseCase(
@@ -35,9 +36,13 @@ def app():
 
     # Define test strategies with low limits for easy testing
     test_strategies = [
-        RateLimitStrategy(name=RateLimitStrategyName.SHORT, limit=2, ttl=60),    # 2/min
-        RateLimitStrategy(name=RateLimitStrategyName.MEDIUM, limit=5, ttl=300),  # 5/5min
-        RateLimitStrategy(name=RateLimitStrategyName.LONG, limit=10, ttl=3600),  # 10/hour
+        RateLimitStrategy(name=RateLimitStrategyName.SHORT, limit=2, ttl=60),  # 2/min
+        RateLimitStrategy(
+            name=RateLimitStrategyName.MEDIUM, limit=5, ttl=300
+        ),  # 5/5min
+        RateLimitStrategy(
+            name=RateLimitStrategyName.LONG, limit=10, ttl=3600
+        ),  # 10/hour
     ]
 
     # Add rate limiting middleware
@@ -46,7 +51,7 @@ def app():
         rate_limit_use_case=rate_limiter,
         default_strategies=test_strategies,
         default_strategy_name=RateLimitStrategyName.MEDIUM,
-        excluded_paths=["/health", "/status", "/api/rate-limit-status"]
+        excluded_paths=["/health", "/status", "/api/rate-limit-status"],
     )
 
     # Health check (excluded from rate limiting)
@@ -83,7 +88,7 @@ def app():
         ttl=300,
         key_type=KeyExtractionType.HEADER,
         key_field="X-API-Key",
-        key_default="anonymous"
+        key_default="anonymous",
     )
     async def premium_endpoint():
         return {"data": "Premium content"}
@@ -95,7 +100,7 @@ def app():
         ttl=600,
         key_type=KeyExtractionType.QUERY_PARAM,
         key_field="user_id",
-        key_default="anonymous"
+        key_default="anonymous",
     )
     async def get_user_data():
         return {"data": "User-specific data"}
@@ -109,7 +114,7 @@ def app():
         limit=2,
         ttl=60,
         bypass_function=bypass_for_admins,
-        custom_error_message="Admin endpoint is rate limited for non-admin users"
+        custom_error_message="Admin endpoint is rate limited for non-admin users",
     )
     async def admin_endpoint():
         return {"data": "Admin-only data"}
@@ -126,12 +131,12 @@ def app():
                 "remaining": result.remaining_requests,
                 "reset_in_seconds": result.ttl,
                 "usage_percentage": result.usage_percentage,
-                "strategy": result.strategy_name
+                "strategy": result.strategy_name,
             }
         except Exception as e:
             return JSONResponse(
                 status_code=500,
-                content={"error": "Failed to get rate limit status", "detail": str(e)}
+                content={"error": "Failed to get rate limit status", "detail": str(e)},
             )
 
     return test_app
@@ -219,7 +224,7 @@ class TestKeyExtractionTypes:
         """Test header-based rate limiting."""
         # Test with API key header
         headers = {"X-API-Key": "test-key-123"}
-        
+
         # First 4 requests with same API key should succeed
         for i in range(4):
             response = await client.get("/api/premium", headers=headers)
@@ -238,7 +243,7 @@ class TestKeyExtractionTypes:
         """Test query parameter-based rate limiting."""
         # Test with user_id parameter
         params = {"user_id": "user123"}
-        
+
         # First 3 requests for same user should succeed
         for i in range(3):
             response = await client.get("/api/user-data", params=params)
@@ -282,7 +287,7 @@ class TestRateLimitHeaders:
         """Test that rate limit headers are present in responses."""
         response = await client.get("/api/data")
         assert response.status_code == 200
-        
+
         # Check required headers
         assert "X-RateLimit-Limit" in response.headers
         assert "X-RateLimit-Remaining" in response.headers
@@ -324,13 +329,13 @@ class TestStatusEndpoint:
         # Check status
         response = await client.get("/api/rate-limit-status")
         assert response.status_code == 200
-        
+
         status = response.json()
         assert "current_count" in status
         assert "limit" in status
         assert "remaining" in status
         assert "strategy" in status
-        
+
         # Should show 2 requests used (status endpoint is excluded from counting)
         assert status["current_count"] == 2
         assert status["limit"] == 5
@@ -361,13 +366,13 @@ class TestErrorMessages:
         # Next request should return proper error format
         response = await client.get("/api/data")
         assert response.status_code == 429
-        
+
         error = response.json()
         assert "message" in error
         assert "retry_after" in error
         assert "limit" in error
         assert "window" in error
-        
+
         assert error["limit"] == 5
         assert error["window"] == 300
 
@@ -380,7 +385,7 @@ class TestErrorMessages:
         # Next request should return custom error message
         response = await client.get("/api/admin")
         assert response.status_code == 429
-        
+
         error = response.json()
         assert "Admin endpoint is rate limited for non-admin users" in error["message"]
 
@@ -391,15 +396,19 @@ class TestConcurrency:
     async def test_concurrent_requests(self, client):
         """Test that concurrent requests are properly rate limited."""
         import asyncio
-        
+
         # Make 10 concurrent requests
         tasks = [client.get("/api/data") for _ in range(10)]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Count successful and rate-limited responses
-        successful = sum(1 for r in responses if hasattr(r, 'status_code') and r.status_code == 200)
-        rate_limited = sum(1 for r in responses if hasattr(r, 'status_code') and r.status_code == 429)
-        
+        successful = sum(
+            1 for r in responses if hasattr(r, "status_code") and r.status_code == 200
+        )
+        rate_limited = sum(
+            1 for r in responses if hasattr(r, "status_code") and r.status_code == 429
+        )
+
         # Should have exactly 5 successful and 5 rate-limited
         assert successful == 5
         assert rate_limited == 5
