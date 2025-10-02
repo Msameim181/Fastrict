@@ -110,6 +110,17 @@ class RateLimitUseCase:
                 request, key_strategy, effective_mode, route_path
             )
 
+            # Check if route is configured to bypass rate limiting
+            if config and config.bypass:
+                return RateLimitResult(
+                    allowed=True,
+                    key=rate_limit_key,
+                    current_count=0,
+                    limit=strategy.limit,
+                    ttl=strategy.ttl,
+                    strategy_name=strategy.name,
+                )
+
             # Check bypass function if provided
             if config and config.bypass_function:
                 try:
