@@ -9,7 +9,7 @@ from ..entities import KeyExtractionStrategy, KeyExtractionType
 
 class RateLimitException(Exception):
     """Custom exception for rate limiting errors."""
-    
+
     def __init__(self, message: str, status_code: int = 500):
         self.message = message
         self.status_code = status_code
@@ -55,7 +55,7 @@ class KeyExtractionUseCase:
             else:
                 raise RateLimitException(
                     message=f"Invalid key extraction type: {strategy.type}",
-                    status_code=400
+                    status_code=400,
                 )
         except Exception as e:
             self.logger.error(f"Key extraction failed: {str(e)}")
@@ -78,7 +78,9 @@ class KeyExtractionUseCase:
         client_ip = getattr(request.client, "host", "unknown")
         return client_ip
 
-    def _extract_header_key(self, request: Request, strategy: KeyExtractionStrategy) -> str:
+    def _extract_header_key(
+        self, request: Request, strategy: KeyExtractionStrategy
+    ) -> str:
         """Extract header value as rate limiting key."""
         header_value = request.headers.get(strategy.field_name)
         if not header_value:
@@ -88,7 +90,9 @@ class KeyExtractionUseCase:
             return self._extract_ip_key(request)
         return header_value
 
-    def _extract_query_param_key(self, request: Request, strategy: KeyExtractionStrategy) -> str:
+    def _extract_query_param_key(
+        self, request: Request, strategy: KeyExtractionStrategy
+    ) -> str:
         """Extract query parameter as rate limiting key."""
         param_value = request.query_params.get(strategy.field_name)
         if not param_value:
@@ -98,7 +102,9 @@ class KeyExtractionUseCase:
             return self._extract_ip_key(request)
         return param_value
 
-    def _extract_form_field_key(self, request: Request, strategy: KeyExtractionStrategy) -> str:
+    def _extract_form_field_key(
+        self, request: Request, strategy: KeyExtractionStrategy
+    ) -> str:
         """Extract form field as rate limiting key."""
         # This would require accessing form data, which is async
         # For now, fall back to default or IP
@@ -106,12 +112,13 @@ class KeyExtractionUseCase:
             return strategy.default_value
         return self._extract_ip_key(request)
 
-    def _extract_custom_key(self, request: Request, strategy: KeyExtractionStrategy) -> str:
+    def _extract_custom_key(
+        self, request: Request, strategy: KeyExtractionStrategy
+    ) -> str:
         """Extract key using custom function."""
         if not strategy.extractor_function:
             raise RateLimitException(
-                message="Custom extractor function not provided",
-                status_code=500
+                message="Custom extractor function not provided", status_code=500
             )
 
         try:
@@ -121,12 +128,13 @@ class KeyExtractionUseCase:
             # Fall back to IP
             return self._extract_ip_key(request)
 
-    def _extract_combined_key(self, request: Request, strategy: KeyExtractionStrategy) -> str:
+    def _extract_combined_key(
+        self, request: Request, strategy: KeyExtractionStrategy
+    ) -> str:
         """Extract combined key from multiple sources."""
         if not strategy.combination_keys:
             raise RateLimitException(
-                message="Combination keys not provided",
-                status_code=500
+                message="Combination keys not provided", status_code=500
             )
 
         key_parts = []
@@ -169,7 +177,9 @@ class KeyExtractionUseCase:
             elif strategy.type == KeyExtractionType.CUSTOM:
                 return callable(strategy.extractor_function)
             elif strategy.type == KeyExtractionType.COMBINED:
-                return bool(strategy.combination_keys and len(strategy.combination_keys) >= 2)
+                return bool(
+                    strategy.combination_keys and len(strategy.combination_keys) >= 2
+                )
             return False
         except Exception as e:
             self.logger.error(f"Strategy validation failed: {str(e)}")

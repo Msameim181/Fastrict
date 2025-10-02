@@ -7,6 +7,7 @@ from ..entities import (
     KeyExtractionStrategy,
     KeyExtractionType,
     RateLimitConfig,
+    RateLimitMode,
     RateLimitResult,
     RateLimitStrategy,
     RateLimitStrategyName,
@@ -74,6 +75,8 @@ class RateLimitUseCase:
         request: Request,
         config: Optional[RateLimitConfig] = None,
         default_strategy_name: RateLimitStrategyName = RateLimitStrategyName.MEDIUM,
+        middleware_rate_limit_mode: RateLimitMode = RateLimitMode.GLOBAL,
+        route_path: Optional[str] = None,
     ) -> RateLimitResult:
         """Check if request should be rate limited.
 
@@ -81,6 +84,8 @@ class RateLimitUseCase:
             request: FastAPI request object
             config: Optional route-specific configuration
             default_strategy_name: Default strategy if none specified
+            middleware_rate_limit_mode: How rate limits are applied globally
+            route_path: The route path for per-route limiting
 
         Returns:
             RateLimitResult: Result of rate limit check
@@ -92,12 +97,17 @@ class RateLimitUseCase:
             # Determine strategy to use
             strategy = self._determine_strategy(config, default_strategy_name)
 
+            # Determine effective rate limiting mode
+            effective_mode = self._determine_rate_limit_mode(
+                config, middleware_rate_limit_mode
+            )
+
             # Determine key extraction strategy
             key_strategy = self._determine_key_strategy(config)
 
-            # Extract rate limiting key
-            rate_limit_key = self.key_extraction_use_case.extract_key(
-                request, key_strategy
+            # Extract rate limiting key (now considering the rate limiting mode)
+            rate_limit_key = self._build_rate_limit_key(
+                request, key_strategy, effective_mode, route_path
             )
 
             # Check bypass function if provided
@@ -192,6 +202,55 @@ class RateLimitUseCase:
         # Default to IP-based key extraction
         return KeyExtractionStrategy(type=KeyExtractionType.IP)
 
+    def _determine_rate_limit_mode(
+        self, config: Optional[RateLimitConfig], middleware_mode: RateLimitMode
+    ) -> RateLimitMode:
+        """Determine the effective rate limiting mode to use.
+
+        Priority:
+        1. Route-specific configuration (from decorator)
+        2. If decorator is used without explicit mode, force PER_ROUTE
+        3. Middleware default mode
+        """
+        if config:
+            # If route config has explicit mode, use it
+            if config.rate_limit_mode:
+                return config.rate_limit_mode
+            # If route config exists (decorator was used) but no explicit mode,
+            # default to PER_ROUTE for decorated routes
+            return RateLimitMode.PER_ROUTE
+
+        # No route config, use middleware mode
+        return middleware_mode
+
+    def _build_rate_limit_key(
+        self,
+        request: Request,
+        key_strategy: KeyExtractionStrategy,
+        rate_limit_mode: RateLimitMode,
+        route_path: Optional[str] = None,
+    ) -> str:
+        """Build the complete rate limiting key based on mode and extraction strategy."""
+        # Extract the base key using the extraction strategy
+        base_key = self.key_extraction_use_case.extract_key(request, key_strategy)
+
+        if rate_limit_mode == RateLimitMode.PER_ROUTE:
+            # For per-route limiting, include the route path in the key
+            route_identifier = route_path or request.url.path
+            # Clean the route path for use in key (remove special characters, normalize)
+            clean_route = (
+                route_identifier.replace("/", "_")
+                .replace("?", "")
+                .replace("&", "")
+                .strip("_")
+            )
+            if not clean_route:
+                clean_route = "root"
+            return f"route:{clean_route}:{base_key}"
+        else:
+            # For global limiting, use the base key as-is
+            return f"global:{base_key}"
+
     def _get_error_message(
         self, config: Optional[RateLimitConfig], result: RateLimitResult
     ) -> str:
@@ -209,6 +268,8 @@ class RateLimitUseCase:
         request: Request,
         config: Optional[RateLimitConfig] = None,
         default_strategy_name: RateLimitStrategyName = RateLimitStrategyName.MEDIUM,
+        middleware_rate_limit_mode: RateLimitMode = RateLimitMode.GLOBAL,
+        route_path: Optional[str] = None,
     ) -> RateLimitResult:
         """Get current rate limit usage without incrementing counter.
 
@@ -216,15 +277,20 @@ class RateLimitUseCase:
             request: FastAPI request object
             config: Optional route-specific configuration
             default_strategy_name: Default strategy if none specified
+            middleware_rate_limit_mode: How rate limits are applied globally
+            route_path: The route path for per-route limiting
 
         Returns:
             RateLimitResult: Current usage information
         """
         try:
             strategy = self._determine_strategy(config, default_strategy_name)
+            effective_mode = self._determine_rate_limit_mode(
+                config, middleware_rate_limit_mode
+            )
             key_strategy = self._determine_key_strategy(config)
-            rate_limit_key = self.key_extraction_use_case.extract_key(
-                request, key_strategy
+            rate_limit_key = self._build_rate_limit_key(
+                request, key_strategy, effective_mode, route_path
             )
 
             current_count = self.rate_limit_repository.get_current_count(
