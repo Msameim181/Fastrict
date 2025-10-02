@@ -20,6 +20,7 @@ def throttle(
     key_default: Optional[str] = None,
     key_extractor: Optional[Callable] = None,
     key_combination: Optional[list] = None,
+    bypass: bool = False,
     bypass_function: Optional[Callable] = None,
     custom_error_message: Optional[str] = None,
     enabled: bool = True,
@@ -39,6 +40,7 @@ def throttle(
         key_default: Default value if extraction fails
         key_extractor: Custom function for key extraction
         key_combination: List of keys for combined extraction
+        bypass: Whether to completely bypass rate limiting for this route
         bypass_function: Function to bypass rate limiting based on request
         custom_error_message: Custom error message for rate limit violations
         enabled: Whether rate limiting is enabled for this route
@@ -60,6 +62,10 @@ def throttle(
             rate_limit_mode=RateLimitMode.GLOBAL
         )
         async def global_shared_endpoint():
+            pass
+
+        @throttle(bypass=True)
+        async def unrestricted_endpoint():
             pass
     """
 
@@ -102,6 +108,7 @@ def throttle(
             strategy_name=strategy_name,
             key_extraction=key_extraction,
             enabled=enabled,
+            bypass=bypass,
             bypass_function=bypass_function,
             custom_error_message=custom_error_message,
             rate_limit_mode=rate_limit_mode,
