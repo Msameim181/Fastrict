@@ -20,6 +20,7 @@ def throttle(
     key_default: Optional[str] = None,
     key_extractor: Optional[Callable] = None,
     key_combination: Optional[list] = None,
+    key_extraction_strategy: Optional[KeyExtractionStrategy] = None,
     bypass: bool = False,
     bypass_function: Optional[Callable] = None,
     custom_error_message: Optional[str] = None,
@@ -40,6 +41,7 @@ def throttle(
         key_default: Default value if extraction fails
         key_extractor: Custom function for key extraction
         key_combination: List of keys for combined extraction
+        key_extraction_strategy: Complete KeyExtractionStrategy object (overrides other key_* params)
         bypass: Whether to completely bypass rate limiting for this route
         bypass_function: Function to bypass rate limiting based on request
         custom_error_message: Custom error message for rate limit violations
@@ -54,6 +56,10 @@ def throttle(
 
         @throttle(limit=5, ttl=60, key_type=KeyExtractionType.HEADER, key_field="API-Key")
         async def api_endpoint():
+            pass
+
+        @throttle(limit=10, ttl=300, key_extraction_strategy=create_auth_header_fallback())
+        async def fallback_endpoint():
             pass
 
         @throttle(
@@ -94,13 +100,19 @@ def throttle(
             strategy_name = RateLimitStrategyName.MEDIUM
 
         # Create key extraction strategy
-        key_extraction = KeyExtractionStrategy(
-            type=key_type,
-            field_name=key_field,
-            default_value=key_default,
-            extractor_function=key_extractor,
-            combination_keys=key_combination,
-        )
+        key_extraction = None
+        if key_extraction_strategy:
+            # Use provided KeyExtractionStrategy object directly
+            key_extraction = key_extraction_strategy
+        else:
+            # Build from individual parameters
+            key_extraction = KeyExtractionStrategy(
+                type=key_type,
+                field_name=key_field,
+                default_value=key_default,
+                extractor_function=key_extractor,
+                combination_keys=key_combination,
+            )
 
         # Create configuration
         config = RateLimitConfig(
@@ -146,3 +158,95 @@ def is_rate_limited(func: Callable) -> bool:
     """
     config = get_rate_limit_config(func)
     return config is not None and config.enabled
+
+
+# Helper functions for creating common fallback strategies
+def create_auth_header_fallback(
+    header_name: str = "Authorization", default_value: Optional[str] = None
+) -> KeyExtractionStrategy:
+    """Create a fallback strategy that tries auth header first, then IP.
+
+    Args:
+        header_name: Name of the authorization header (default: "Authorization")
+        default_value: Default value if header extraction fails
+
+    Returns:
+        KeyExtractionStrategy: Fallback strategy
+    """
+    return KeyExtractionStrategy(
+        type=KeyExtractionType.FALLBACK,
+        fallback_strategies=[
+            KeyExtractionStrategy(
+                type=KeyExtractionType.HEADER,
+                field_name=header_name,
+                default_value=default_value,
+            ),
+            KeyExtractionStrategy(type=KeyExtractionType.IP),
+        ],
+    )
+
+
+def create_api_key_fallback(
+    api_key_header: str = "X-API-Key",
+    auth_header: str = "Authorization",
+    default_value: Optional[str] = None,
+) -> KeyExtractionStrategy:
+    """Create a fallback strategy that tries API key, then auth header, then IP.
+
+    Args:
+        api_key_header: Name of the API key header (default: "X-API-Key")
+        auth_header: Name of the authorization header (default: "Authorization")
+        default_value: Default value if all header extractions fail
+
+    Returns:
+        KeyExtractionStrategy: Fallback strategy
+    """
+    return KeyExtractionStrategy(
+        type=KeyExtractionType.FALLBACK,
+        fallback_strategies=[
+            KeyExtractionStrategy(
+                type=KeyExtractionType.HEADER,
+                field_name=api_key_header,
+                default_value=default_value,
+            ),
+            KeyExtractionStrategy(
+                type=KeyExtractionType.HEADER,
+                field_name=auth_header,
+                default_value=default_value,
+            ),
+            KeyExtractionStrategy(type=KeyExtractionType.IP),
+        ],
+    )
+
+
+def create_user_id_fallback(
+    user_id_param: str = "user_id",
+    user_id_header: str = "X-User-ID",
+    default_value: Optional[str] = None,
+) -> KeyExtractionStrategy:
+    """Create a fallback strategy that tries user ID from query param, then header, then IP.
+
+    Args:
+        user_id_param: Name of the user ID query parameter (default: "user_id")
+        user_id_header: Name of the user ID header (default: "X-User-ID")
+        default_value: Default value if user ID extraction fails
+
+    Returns:
+        KeyExtractionStrategy: Fallback strategy
+    """
+    return KeyExtractionStrategy(
+        type=KeyExtractionType.FALLBACK,
+        fallback_strategies=[
+            KeyExtractionStrategy(
+                type=KeyExtractionType.QUERY_PARAM,
+                field_name=user_id_param,
+                default_value=default_value,
+            ),
+            KeyExtractionStrategy(
+                type=KeyExtractionType.HEADER,
+                field_name=user_id_header,
+                default_value=default_value,
+            ),
+            KeyExtractionStrategy(type=KeyExtractionType.IP),
+        ],
+    )
