@@ -30,10 +30,16 @@ from .entities import (
     RateLimitStrategy,
     RateLimitStrategyName,
 )
-from .frameworks import RateLimitMiddleware, throttle
+from .frameworks import (
+    RateLimitMiddleware,
+    create_api_key_fallback,
+    create_auth_header_fallback,
+    create_user_id_fallback,
+    throttle,
+)
 from .use_cases import KeyExtractionUseCase, RateLimitUseCase
 
-__version__ = "0.0.3"
+__version__ = "0.1.0"
 __author__ = "Mohammad Mahdi Samei"
 __email__ = "9259samei@gmail.com"
 
@@ -49,6 +55,10 @@ __all__ = [
     # Framework components
     "RateLimitMiddleware",
     "throttle",
+    # Helper functions for common patterns
+    "create_auth_header_fallback",
+    "create_api_key_fallback",
+    "create_user_id_fallback",
     # Use cases
     "KeyExtractionUseCase",
     "RateLimitUseCase",
