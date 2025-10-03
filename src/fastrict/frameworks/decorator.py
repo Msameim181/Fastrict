@@ -1,4 +1,3 @@
-import functools
 from typing import Callable, Optional, Union
 
 from ..entities import (
@@ -76,13 +75,7 @@ def throttle(
     """
 
     def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            # The actual rate limiting logic will be handled by the middleware
-            # This decorator just attaches the configuration to the function
-            return await func(*args, **kwargs)
-
-        # Create rate limit configuration
+        # Create rate limit configuration first
         rate_limit_strategy = None
         strategy_name = None
 
@@ -126,11 +119,14 @@ def throttle(
             rate_limit_mode=rate_limit_mode,
         )
 
-        # Attach configuration to the wrapped function
-        wrapper._rate_limit_config = config
-        wrapper._original_func = func
+        # Instead of creating wrapper functions that can interfere with FastAPI's type introspection,
+        # we'll just attach the configuration directly to the original function.
+        # This prevents any signature modification that could cause TypeAdapter issues.
 
-        return wrapper
+        func._rate_limit_config = config
+        func._original_func = func
+
+        return func
 
     return decorator
 
