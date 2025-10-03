@@ -77,20 +77,30 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         # Skip excluded paths
         if self._is_path_excluded(request.url.path):
-            self.logger.debug(f"Path {request.url.path} is excluded from rate limiting")
+            self.logger.debug(
+                "Path %s is excluded from rate limiting", request.url.path
+            )
             return await call_next(request)
 
         try:
             # Get route-specific configuration
             endpoint = request.scope.get("endpoint")
             route_config = None
+
             # If endpoint is not in scope (common with middleware),
             # try to find it from the FastAPI app's routes
             if not endpoint:
                 endpoint = self._find_endpoint_from_app(request)
 
             if endpoint:
-                route_config = get_rate_limit_config(endpoint)
+                try:
+                    route_config = get_rate_limit_config(endpoint)
+                except Exception as config_error:
+                    self.logger.debug(
+                        "Failed to get rate limit config from endpoint: %s"
+                        % str(config_error)
+                    )
+                    route_config = None
 
                 # Skip if route has rate limiting disabled
                 if route_config and not route_config.enabled:
@@ -123,7 +133,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         except Exception as e:
             # Log error but don't block request on middleware failure
-            self.logger.error(f"Rate limiting middleware error: {str(e)}")
+            self.logger.error("Rate limiting middleware error: %s", str(e))
             return await call_next(request)
 
     def _is_path_excluded(self, path: str) -> bool:
@@ -175,22 +185,28 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             # Try to match the route
             for route in app.router.routes:
-                match, _ = route.matches(
-                    {
+                try:
+                    match, _ = route.matches({
                         "type": "http",
                         "method": method,
                         "path": path,
-                    }
-                )
-                if match == Match.FULL:
-                    # Found matching route, get the endpoint
-                    endpoint = getattr(route, "endpoint", None)
-                    return endpoint
+                    })
+                    if match == Match.FULL:
+                        # Found matching route, get the endpoint
+                        endpoint = getattr(route, "endpoint", None)
+                        return endpoint
+                except Exception as route_error:
+                    # Log but continue trying other routes
+                    self.logger.debug(
+                        "Error matching route %s: %s", route, str(route_error)
+                    )
+                    continue
 
             return None
 
-        except Exception:
+        except Exception as e:
             # If route matching fails, return None to fall back to default behavior
+            self.logger.debug(f"Route matching failed: {str(e)}")
             return None
 
     def update_strategies(self, strategies: List[RateLimitStrategy]) -> None:
