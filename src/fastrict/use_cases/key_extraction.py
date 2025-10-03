@@ -52,6 +52,8 @@ class KeyExtractionUseCase:
                 return self._extract_custom_key(request, strategy)
             elif strategy.type == KeyExtractionType.COMBINED:
                 return self._extract_combined_key(request, strategy)
+            elif strategy.type == KeyExtractionType.FALLBACK:
+                return self._extract_fallback_key(request, strategy)
             else:
                 raise RateLimitException(
                     message=f"Invalid key extraction type: {strategy.type}",
@@ -156,6 +158,39 @@ class KeyExtractionUseCase:
         combined_key = "|".join(key_parts)
         return hashlib.sha256(combined_key.encode()).hexdigest()[:32]
 
+    def _extract_fallback_key(
+        self, request: Request, strategy: KeyExtractionStrategy
+    ) -> str:
+        """Extract key using fallback strategies in sequence.
+
+        Tries each strategy in the fallback list until one succeeds.
+        If all fail, falls back to IP extraction.
+        """
+        if not strategy.fallback_strategies:
+            raise RateLimitException(
+                message="Fallback strategies not provided", status_code=500
+            )
+
+        for fallback_strategy in strategy.fallback_strategies:
+            try:
+                # Recursively extract using each fallback strategy
+                result = self.extract_key(request, fallback_strategy)
+                # If we get a valid result (not just IP fallback), use it
+                if (
+                    result != self._extract_ip_key(request)
+                    or fallback_strategy.type == KeyExtractionType.IP
+                ):
+                    return result
+            except Exception as e:
+                self.logger.debug(
+                    f"Fallback strategy {fallback_strategy.type} failed: {str(e)}"
+                )
+                continue
+
+        # If all fallback strategies fail, use IP as final fallback
+        self.logger.warning("All fallback strategies failed, using IP address")
+        return self._extract_ip_key(request)
+
     def validate_strategy(self, strategy: KeyExtractionStrategy) -> bool:
         """Validate that a key extraction strategy is properly configured.
 
@@ -179,6 +214,11 @@ class KeyExtractionUseCase:
             elif strategy.type == KeyExtractionType.COMBINED:
                 return bool(
                     strategy.combination_keys and len(strategy.combination_keys) >= 2
+                )
+            elif strategy.type == KeyExtractionType.FALLBACK:
+                return bool(
+                    strategy.fallback_strategies
+                    and len(strategy.fallback_strategies) >= 2
                 )
             return False
         except Exception as e:
