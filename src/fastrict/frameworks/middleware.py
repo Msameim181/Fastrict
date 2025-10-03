@@ -5,7 +5,12 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from ..entities import RateLimitMode, RateLimitStrategy, RateLimitStrategyName
+from ..entities import (
+    KeyExtractionStrategy,
+    RateLimitMode,
+    RateLimitStrategy,
+    RateLimitStrategyName,
+)
 from ..use_cases import RateLimitUseCase
 from ..use_cases.rate_limit import RateLimitHTTPException
 from .decorator import get_rate_limit_config
@@ -29,6 +34,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         enabled: bool = True,
         logger: Optional[logging.Logger] = None,
         rate_limit_mode: RateLimitMode = RateLimitMode.GLOBAL,
+        default_key_extraction: Optional[KeyExtractionStrategy] = None,
     ):
         """
         Initialize rate limiting middleware.
@@ -41,6 +47,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             excluded_paths: Paths to exclude from rate limiting
             enabled: Whether rate limiting is globally enabled
             rate_limit_mode: How to apply rate limits (GLOBAL or PER_ROUTE)
+            default_key_extraction: Default key extraction strategy for all routes
         """
         super().__init__(app)
         self.rate_limit_use_case = rate_limit_use_case
@@ -48,6 +55,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.excluded_paths = excluded_paths or []
         self.enabled = enabled
         self.rate_limit_mode = rate_limit_mode
+        self.default_key_extraction = default_key_extraction
         self.logger = logger or logging.getLogger("fastrict.middleware")
 
         # Update strategies if provided
@@ -96,6 +104,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     default_strategy_name=self.default_strategy_name,
                     middleware_rate_limit_mode=self.rate_limit_mode,
                     route_path=request.url.path,
+                    middleware_default_key_extraction=self.default_key_extraction,
                 )
 
                 # Continue to next handler
@@ -199,6 +208,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             strategy_name: New default strategy name
         """
         self.default_strategy_name = strategy_name
+
+    def set_default_key_extraction(
+        self, key_extraction: Optional[KeyExtractionStrategy]
+    ) -> None:
+        """Update default key extraction strategy.
+
+        Args:
+            key_extraction: New default key extraction strategy
+        """
+        self.default_key_extraction = key_extraction
 
     def disable(self) -> None:
         """Disable rate limiting middleware."""
