@@ -77,6 +77,7 @@ class RateLimitUseCase:
         default_strategy_name: RateLimitStrategyName = RateLimitStrategyName.MEDIUM,
         middleware_rate_limit_mode: RateLimitMode = RateLimitMode.GLOBAL,
         route_path: Optional[str] = None,
+        middleware_default_key_extraction: Optional[KeyExtractionStrategy] = None,
     ) -> RateLimitResult:
         """Check if request should be rate limited.
 
@@ -86,6 +87,7 @@ class RateLimitUseCase:
             default_strategy_name: Default strategy if none specified
             middleware_rate_limit_mode: How rate limits are applied globally
             route_path: The route path for per-route limiting
+            middleware_default_key_extraction: Default key extraction strategy from middleware
 
         Returns:
             RateLimitResult: Result of rate limit check
@@ -103,7 +105,9 @@ class RateLimitUseCase:
             )
 
             # Determine key extraction strategy
-            key_strategy = self._determine_key_strategy(config)
+            key_strategy = self._determine_key_strategy(
+                config, middleware_default_key_extraction
+            )
 
             # Extract rate limiting key (now considering the rate limiting mode)
             rate_limit_key = self._build_rate_limit_key(
@@ -204,11 +208,22 @@ class RateLimitUseCase:
         return strategy
 
     def _determine_key_strategy(
-        self, config: Optional[RateLimitConfig]
+        self,
+        config: Optional[RateLimitConfig],
+        middleware_default: Optional[KeyExtractionStrategy] = None,
     ) -> KeyExtractionStrategy:
-        """Determine key extraction strategy to use."""
+        """Determine key extraction strategy to use.
+
+        Priority:
+        1. Route-specific configuration (from decorator)
+        2. Middleware default key extraction strategy
+        3. IP-based fallback
+        """
         if config and config.key_extraction:
             return config.key_extraction
+
+        if middleware_default:
+            return middleware_default
 
         # Default to IP-based key extraction
         return KeyExtractionStrategy(type=KeyExtractionType.IP)
@@ -281,6 +296,7 @@ class RateLimitUseCase:
         default_strategy_name: RateLimitStrategyName = RateLimitStrategyName.MEDIUM,
         middleware_rate_limit_mode: RateLimitMode = RateLimitMode.GLOBAL,
         route_path: Optional[str] = None,
+        middleware_default_key_extraction: Optional[KeyExtractionStrategy] = None,
     ) -> RateLimitResult:
         """Get current rate limit usage without incrementing counter.
 
@@ -290,6 +306,7 @@ class RateLimitUseCase:
             default_strategy_name: Default strategy if none specified
             middleware_rate_limit_mode: How rate limits are applied globally
             route_path: The route path for per-route limiting
+            middleware_default_key_extraction: Default key extraction strategy from middleware
 
         Returns:
             RateLimitResult: Current usage information
@@ -299,7 +316,9 @@ class RateLimitUseCase:
             effective_mode = self._determine_rate_limit_mode(
                 config, middleware_rate_limit_mode
             )
-            key_strategy = self._determine_key_strategy(config)
+            key_strategy = self._determine_key_strategy(
+                config, middleware_default_key_extraction
+            )
             rate_limit_key = self._build_rate_limit_key(
                 request, key_strategy, effective_mode, route_path
             )
