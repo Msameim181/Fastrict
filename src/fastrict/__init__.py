@@ -39,7 +39,7 @@ from .frameworks import (
 )
 from .use_cases import KeyExtractionUseCase, RateLimitUseCase
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Mohammad Mahdi Samei"
 __email__ = "9259samei@gmail.com"
 
