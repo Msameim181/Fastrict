@@ -95,11 +95,17 @@ repository = RedisRateLimitRepository.from_url("redis://localhost:6379")
 key_extraction = KeyExtractionUseCase()
 rate_limiter = RateLimitUseCase(repository, key_extraction)
 
+# Create default key extraction strategy (NEW in v0.1.0)
+# Try API key, then Authorization header, then fall back to IP
+from fastrict import create_api_key_fallback
+default_key_extraction = create_api_key_fallback()
+
 # Add global rate limiting middleware
 app.add_middleware(
     RateLimitMiddleware,
     rate_limit_use_case=rate_limiter,
-    excluded_paths=["/health", "/docs", "/metrics"]
+    excluded_paths=["/health", "/docs", "/metrics"],
+    default_key_extraction=default_key_extraction  # NEW: Default for all routes
 )
 
 @app.get("/api/data")
@@ -238,7 +244,202 @@ async def special_endpoint():
     return {"data": "special"}
 ```
 
-## 🔑 Key Extraction Strategies
+## � Fallback Key Extraction Strategies
+
+**NEW in v0.1.0**: Advanced fallback mechanisms that try multiple extraction methods in sequence.
+
+### 🏗️ Built-in Fallback Helpers
+
+Fastrict provides convenient helper functions for common fallback patterns:
+
+```python
+from fastrict import (
+    create_auth_header_fallback,
+    create_api_key_fallback, 
+    create_user_id_fallback
+)
+
+# Try Authorization header, then IP
+auth_fallback = create_auth_header_fallback(
+    header_name="Authorization",  # Default
+    default_value="anonymous"      # Optional
+)
+
+# Try API key, then Authorization, then IP
+api_fallback = create_api_key_fallback(
+    api_key_header="X-API-Key",    # Default 
+    auth_header="Authorization",    # Default
+    default_value=None             # Will use IP if headers missing
+)
+
+# Try user ID from query param, then header, then IP
+user_fallback = create_user_id_fallback(
+    user_id_param="user_id",       # Default
+    user_id_header="X-User-ID",    # Default
+    default_value="anonymous"      # Optional
+)
+```
+
+### ⚙️ Middleware Default Strategy
+
+Set a default key extraction strategy that applies to all routes:
+
+```python
+from fastrict import RateLimitMiddleware, create_api_key_fallback
+
+# Create fallback strategy for middleware
+default_strategy = create_api_key_fallback(
+    api_key_header="X-API-Key",
+    auth_header="Authorization"
+    # Falls back to IP if neither header is present
+)
+
+app.add_middleware(
+    RateLimitMiddleware,
+    rate_limit_use_case=rate_limiter,
+    default_key_extraction=default_strategy,  # Applied to all routes
+    rate_limit_mode=RateLimitMode.GLOBAL
+)
+
+# This endpoint will use the middleware default strategy
+@app.get("/api/data")
+async def get_data():
+    return {"data": "Uses API key → Auth header → IP fallback"}
+
+# This endpoint overrides with its own strategy  
+@app.get("/api/users")
+@throttle(
+    limit=50, ttl=3600,
+    key_extraction_strategy=create_user_id_fallback()
+)
+async def get_users():
+    return {"users": "Uses user ID → header → IP fallback"}
+```
+
+### 🎯 Route-Specific Fallback
+
+Override the middleware default for specific routes:
+
+```python
+# Use helper function directly
+@app.get("/api/auth-required")
+@throttle(
+    limit=100, ttl=3600,
+    key_extraction_strategy=create_auth_header_fallback()
+)
+async def auth_endpoint():
+    return {"data": "auth-protected"}
+
+# Custom fallback strategy
+from fastrict import KeyExtractionStrategy, KeyExtractionType
+
+custom_fallback = KeyExtractionStrategy(
+    type=KeyExtractionType.FALLBACK,
+    fallback_strategies=[
+        KeyExtractionStrategy(
+            type=KeyExtractionType.HEADER,
+            field_name="X-Session-ID"
+        ),
+        KeyExtractionStrategy(
+            type=KeyExtractionType.HEADER, 
+            field_name="X-API-Key"
+        ),
+        KeyExtractionStrategy(
+            type=KeyExtractionType.IP
+        )
+    ]
+)
+
+@app.get("/api/session-data")
+@throttle(
+    limit=50, ttl=600,
+    key_extraction_strategy=custom_fallback
+)
+async def session_endpoint():
+    return {"data": "session-based rate limiting"}
+```
+
+### 🔄 How Fallback Works
+
+1. **Try first strategy**: Attempt to extract key using the first method
+2. **Check success**: If extraction succeeds and returns a valid key, use it
+3. **Try next strategy**: If extraction fails or returns empty, try next method
+4. **Continue sequence**: Repeat until a strategy succeeds
+5. **IP fallback**: If all strategies fail, fall back to IP address
+
+```python
+# Example: API key → Auth header → IP fallback
+api_fallback = create_api_key_fallback()
+
+# For a request with these headers:
+# X-API-Key: "" (empty)
+# Authorization: "Bearer token123"
+# Client IP: "192.168.1.100"
+
+# Fallback process:
+# 1. Try X-API-Key → empty, skip
+# 2. Try Authorization → "Bearer token123" ✓
+# Result: Rate limiting key = "Bearer token123"
+```
+
+### 🏢 Real-World Example
+
+```python
+# Multi-tenant SaaS with intelligent key extraction
+from fastrict import create_api_key_fallback, RateLimitMode
+
+# Middleware default: API key for tenant isolation
+default_strategy = create_api_key_fallback(
+    api_key_header="X-API-Key",
+    auth_header="Authorization"
+)
+
+app.add_middleware(
+    RateLimitMiddleware,
+    rate_limit_use_case=rate_limiter,
+    default_key_extraction=default_strategy,
+    rate_limit_mode=RateLimitMode.GLOBAL,
+    default_strategy_name=RateLimitStrategyName.MEDIUM
+)
+
+# Public endpoints use IP-based limiting
+@app.get("/api/public")
+@throttle(
+    limit=100, ttl=3600,
+    key_extraction_strategy=KeyExtractionStrategy(type=KeyExtractionType.IP)
+)
+async def public_data():
+    return {"data": "public"}
+
+# User endpoints prefer user ID over API key
+@app.get("/api/user-profile")
+@throttle(
+    limit=200, ttl=3600,
+    key_extraction_strategy=create_user_id_fallback()
+)
+async def user_profile():
+    return {"profile": "user data"}
+
+# Admin endpoints use session-based limiting
+admin_fallback = KeyExtractionStrategy(
+    type=KeyExtractionType.FALLBACK,
+    fallback_strategies=[
+        KeyExtractionStrategy(type=KeyExtractionType.HEADER, field_name="Admin-Session"),
+        KeyExtractionStrategy(type=KeyExtractionType.HEADER, field_name="X-API-Key"),
+        KeyExtractionStrategy(type=KeyExtractionType.IP)
+    ]
+)
+
+@app.get("/api/admin")
+@throttle(
+    limit=1000, ttl=3600,
+    key_extraction_strategy=admin_fallback
+)
+async def admin_endpoint():
+    return {"data": "admin-only"}
+```
+
+## �🔑 Key Extraction Strategies
 
 ### 📍 IP-Based (Default)
 ```python
@@ -1066,7 +1267,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📈 Changelog & Roadmap
 
-### 🎯 Current Version: `v0.0.3`
+### 🎯 Current Version: `v0.1.0`
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 ### 🚀 Upcoming Features
