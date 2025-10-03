@@ -14,6 +14,7 @@ class KeyExtractionType(str, Enum):
     FORM_FIELD = "form_field"  # Extract from form field
     CUSTOM = "custom"  # Use custom key extraction function
     COMBINED = "combined"  # Combine multiple extraction methods
+    FALLBACK = "fallback"  # Try multiple strategies in sequence
 
 
 class RateLimitStrategyName(str, Enum):

@@ -59,6 +59,10 @@ class KeyExtractionStrategy(BaseModel):
     combination_keys: Optional[List[str]] = Field(
         default=None, description="List of keys to combine for COMBINED type"
     )
+    fallback_strategies: Optional[List["KeyExtractionStrategy"]] = Field(
+        default=None,
+        description="List of strategies to try in sequence for FALLBACK type",
+    )
 
     model_config = ConfigDict(
         frozen=True, arbitrary_types_allowed=True
@@ -93,6 +97,14 @@ class KeyExtractionStrategy(BaseModel):
         ):
             raise ValueError(
                 "combination_keys must contain at least 2 keys for COMBINED extraction"
+            )
+
+        # Validate fallback_strategies requirement
+        if extraction_type == KeyExtractionType.FALLBACK and (
+            not self.fallback_strategies or len(self.fallback_strategies) < 2
+        ):
+            raise ValueError(
+                "fallback_strategies must contain at least 2 strategies for FALLBACK extraction"
             )
 
         return self
@@ -195,3 +207,7 @@ class RateLimitResult(BaseModel):
             headers["Retry-After"] = str(self.retry_after)
 
         return headers
+
+
+# Update forward references for self-referencing models
+KeyExtractionStrategy.model_rebuild()
