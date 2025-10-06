@@ -35,6 +35,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         logger: Optional[logging.Logger] = None,
         rate_limit_mode: RateLimitMode = RateLimitMode.GLOBAL,
         default_key_extraction: Optional[KeyExtractionStrategy] = None,
+        fail_on_error: bool = True,
     ):
         """
         Initialize rate limiting middleware.
@@ -48,6 +49,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             enabled: Whether rate limiting is globally enabled
             rate_limit_mode: How to apply rate limits (GLOBAL or PER_ROUTE)
             default_key_extraction: Default key extraction strategy for all routes
+            fail_on_error: If True (default), reject requests when rate limiting fails.
+                          If False, allow requests through on errors (less secure but more resilient).
+                          For production, True is recommended for security.
         """
         super().__init__(app)
         self.rate_limit_use_case = rate_limit_use_case
@@ -56,6 +60,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.enabled = enabled
         self.rate_limit_mode = rate_limit_mode
         self.default_key_extraction = default_key_extraction
+        self.fail_on_error = fail_on_error
         self.logger = logger or logging.getLogger("fastrict.middleware")
 
         # Update strategies if provided
@@ -131,10 +136,38 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     status_code=e.status_code, content=e.detail, headers=e.headers
                 )
 
+        except RateLimitHTTPException as e:
+            # Rate limit exceeded at outer level - return error response
+            return JSONResponse(
+                status_code=e.status_code, content=e.detail, headers=e.headers
+            )
         except Exception as e:
-            # Log error but don't block request on middleware failure
-            self.logger.error("Rate limiting middleware error: %s", str(e))
-            return await call_next(request)
+            # Critical error in rate limiting system
+            self.logger.error(
+                "Rate limiting middleware error: %s. Path: %s, Method: %s",
+                str(e),
+                request.url.path,
+                request.method,
+                exc_info=True,
+            )
+
+            if self.fail_on_error:
+                # Fail closed: reject request for security
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "error": "Service Temporarily Unavailable",
+                        "detail": "Rate limiting system error. Please try again later.",
+                        "type": "rate_limit_system_error",
+                    },
+                    headers={"Retry-After": "60"},
+                )
+            else:
+                # Fail open: allow request through (less secure, more resilient)
+                self.logger.warning(
+                    "Allowing request through despite rate limiting error (fail_on_error=False)"
+                )
+                return await call_next(request)
 
     def _is_path_excluded(self, path: str) -> bool:
         """Check if a path should be excluded from rate limiting.
